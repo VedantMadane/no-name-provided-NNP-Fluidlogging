@@ -10,6 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -28,6 +29,7 @@ import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.common.world.AuxiliaryLightManager;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -45,6 +47,9 @@ import static net.minecraft.world.level.block.state.properties.BlockStatePropert
  */
 @Mixin(SimpleWaterloggedBlock.class)
 public interface FFluidlogging_SimpleWaterloggedBlock {
+    @Shadow
+    ItemStack pickupBlock(@Nullable Player player, LevelAccessor level, BlockPos pos, BlockState state);
+    
     /**
      * Allows us to filter which fluids SimpleWaterloggedBlock is compatible with. Needed to jailbreak vanilla
      * limitations, and makes a good hook for configurable white/blacklists.
@@ -112,6 +117,16 @@ public interface FFluidlogging_SimpleWaterloggedBlock {
         AuxiliaryLightManager lManager = level.getAuxLightManager(pos);
         boolean lManagerExists = lManager != null;
         
+        // Attempt to prevent incorrectly set WaterLogged BlockStateProperty in
+        // structures during worldgen. Band-Aid fix.
+        if (fluidState.isEmpty()) {
+            // This method is usually run on both sides, and doesn't always sync everything.
+            // Since this is usually only called on the server, there may be desyncs
+            pickupBlock(null, level, pos, state);
+            
+            return true;
+        }
+        
         if (
             // Don't let players waste buckets
                 (fluidState.isSource() && !oldFluidState.isSource()) ||
@@ -135,7 +150,7 @@ public interface FFluidlogging_SimpleWaterloggedBlock {
                 // Handle the rest
             } else {
                 fluidStates.put(iPos, fluidState);
-                if (!level.isClientSide()) {
+                if (!level.isClientSide() && !(level instanceof WorldGenRegion)) {
                     safeSyncChunkAttachment(chunk, FLUID_STATES);
                 }
                 int lightLevel = fluidState.getFluidType().getLightLevel(fluidState, level, pos);
@@ -158,7 +173,7 @@ public interface FFluidlogging_SimpleWaterloggedBlock {
                 chunk.setUnsaved(true);
             }
             // If these run on the client, they'll trigger before the attachment syncs
-            level.setBlock(iPos, state.setValue(WATERLOGGED, true), Block.UPDATE_ALL);
+            level.setBlock(iPos, state.setValue(WATERLOGGED, !fluidState.isEmpty()), Block.UPDATE_ALL);
             level.scheduleTick(iPos, fluidState.getType(), fluidState.getType().getTickDelay(level));
             // Force a chunk update, if there otherwise wouldn't be one
             if (ServerConfig.forceChunkUpdates) {
@@ -180,16 +195,16 @@ public interface FFluidlogging_SimpleWaterloggedBlock {
     }
     
     /**
-     * Allows SimpleWaterloggedBlock to use our attachment when player's attempt to manually drain them.
+     * Allows SimpleWaterloggedBlock to use our attachment when players attempt to manually drain them.
      * <p>
-     * This runs on both sides, so the sync issues don't affect it.
+     * Vanilla runs this on both sides, so many sync issues don't affect it.
      * </p>
      */
     @Inject(method = "pickupBlock(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/LevelAccessor;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)Lnet/minecraft/world/item/ItemStack;",
             at = @At("RETURN"), cancellable = true)
     private void nnp_f_fluidlogging_pickupBlock(Player player, LevelAccessor level, BlockPos pos, BlockState
             state, CallbackInfoReturnable<ItemStack> cir) {
-        // Unsetting the waterlogged flag is handled by the vanilla method we're injecting after
+        // Setting the waterlogged property to false is handled by the vanilla method we're injecting after
         BlockPos iPos = pos.immutable();
         ChunkAccess chunk = level.getChunk(iPos);
         FluidStates states = chunk.getData(FLUID_STATES);
