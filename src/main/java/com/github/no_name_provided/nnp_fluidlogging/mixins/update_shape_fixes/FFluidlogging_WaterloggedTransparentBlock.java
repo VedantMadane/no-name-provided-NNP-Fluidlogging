@@ -4,12 +4,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.WaterloggedTransparentBlock;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import static com.github.no_name_provided.nnp_fluidlogging.common.attachments.FAttachments.FLUID_STATES;
+import static com.github.no_name_provided.nnp_fluidlogging.common.helpers.MiscHelpers.fixScheduledFluidTick;
 
 @Mixin(WaterloggedTransparentBlock.class)
 public class FFluidlogging_WaterloggedTransparentBlock {
@@ -25,7 +24,6 @@ public class FFluidlogging_WaterloggedTransparentBlock {
     @Redirect(method = "updateShape(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/Direction;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/LevelAccessor;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/state/BlockState;",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/LevelAccessor;scheduleTick(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/material/Fluid;I)V"))
     private void nnp_f_fluidlogging_updateShape(LevelAccessor level, BlockPos pos, Fluid fluid, int tickDelay) {
-        Fluid trueFluid = level.getChunk(pos).getData(FLUID_STATES).getOrDefault(pos, Fluids.EMPTY.defaultFluidState()).getType();
-        level.scheduleTick(pos, trueFluid, trueFluid.getTickDelay(level));
+        fixScheduledFluidTick(level, pos);
     }
 }

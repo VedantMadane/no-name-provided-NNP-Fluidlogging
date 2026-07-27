@@ -37,6 +37,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Optional;
 
 import static com.github.no_name_provided.nnp_fluidlogging.common.attachments.FAttachments.FLUID_STATES;
+import static com.github.no_name_provided.nnp_fluidlogging.common.config.ServerConfig.explicitlyDoNotSupportWorldgen;
 import static com.github.no_name_provided.nnp_fluidlogging.common.data_maps.FDataMaps.BLOCKSTATE_FLUID_LEVEL_LIMITS;
 import static com.github.no_name_provided.nnp_fluidlogging.common.helpers.MiscHelpers.safeSyncChunkAttachment;
 import static com.github.no_name_provided.nnp_fluidlogging.common.helpers.MiscHelpers.updateClientLightLevels;
@@ -106,92 +107,101 @@ public interface FFluidlogging_SimpleWaterloggedBlock {
             }
         }
         
-        // Get current states
-        // Ensure we don't accidentally pass a MutableBlockPos to a buffer, since they violate the Liskov Substitution Principle
-        BlockPos iPos = pos.immutable();
-        ChunkAccess chunk = level.getChunk(iPos);
-        FluidStates fluidStates = chunk.getData(FLUID_STATES);
-        FluidState oldFluidState = fluidStates.getOrDefault(iPos, state.getFluidState());
-        boolean wasLogged = state.getValue(WATERLOGGED);
-        // Handle lighting
-        AuxiliaryLightManager lManager = level.getAuxLightManager(pos);
-        boolean lManagerExists = lManager != null;
-        
-        // Attempt to prevent incorrectly set WaterLogged BlockStateProperty in
-        // structures during worldgen. Band-Aid fix.
-        if (fluidState.isEmpty()) {
-            // This method is usually run on both sides, and doesn't always sync everything.
-            // Since this is usually only called on the server, there may be desyncs
-            pickupBlock(null, level, pos, state);
+        // This mod doesn't handle worldgen gracefully (lag, log spam, theoretically resolved threading issues),
+        // so we filter out calls using WorldGenRegions
+        if (explicitlyDoNotSupportWorldgen && level instanceof WorldGenRegion) {
             
-            return true;
-        }
-        
-        if (
-            // Don't let players waste buckets
-                (fluidState.isSource() && !oldFluidState.isSource()) ||
-                        // but maybe allow fluids to flow in
-                        (ServerConfig.flowingFluidsCanLog && !oldFluidState.isSource())
-        ) {
-            // Special case fully waterlogged blocks
-            if (fluidState.is(Fluids.WATER) && fluidState.isSource()) {
-                // Only sync if we actually update our data structure
-                if (fluidStates.remove(iPos) != null && !level.isClientSide()) {
-                    safeSyncChunkAttachment(chunk, FLUID_STATES);
+            //noinspection SimplifiableConditionalExpression - there are side effects of calling the original
+            return fluidState.isEmpty() ? false : original.call(level, pos, state, fluidState);
+        } else {
+            
+            // Get current states
+            // Ensure we don't accidentally pass a MutableBlockPos to a buffer, since they violate the Liskov Substitution Principle
+            BlockPos iPos = pos.immutable();
+            ChunkAccess chunk = level.getChunk(iPos);
+            FluidStates fluidStates = chunk.getData(FLUID_STATES);
+            FluidState oldFluidState = fluidStates.getOrDefault(iPos, state.getFluidState());
+            boolean wasLogged = state.getValue(WATERLOGGED);
+            // Handle lighting
+            AuxiliaryLightManager lManager = level.getAuxLightManager(pos);
+            boolean lManagerExists = lManager != null;
+            
+            // Attempt to prevent incorrectly set WaterLogged BlockStateProperty in
+            // structures during worldgen. Band-Aid fix.
+            if (fluidState.isEmpty()) {
+                // This method is usually run on both sides, and doesn't always sync everything.
+                // Since this is usually only called on the server, there may be desyncs
+                pickupBlock(null, level, pos, state);
+                
+                return true;
+            }
+            
+            if (
+                // Don't let players waste buckets
+                    (fluidState.isSource() && !oldFluidState.isSource()) ||
+                            // but maybe allow fluids to flow in
+                            (ServerConfig.flowingFluidsCanLog && !oldFluidState.isSource())
+            ) {
+                // Special case fully waterlogged blocks
+                if (fluidState.is(Fluids.WATER) && fluidState.isSource()) {
+                    // Only sync if we actually update our data structure
+                    if (fluidStates.remove(iPos) != null && !level.isClientSide()) {
+                        safeSyncChunkAttachment(chunk, FLUID_STATES);
+                    }
+                    if (lManagerExists) {
+                        lManager.removeLightAt(iPos);
+                    }
+                    if (level.isClientSide()) {
+                        // Strangely, this is the one place where setting the blocks dirty actually had an effect on rendering
+                        ClientClassWrappers.setDirtyFromSharedCode(level, pos, state.setValue(WATERLOGGED, true), state.setValue(WATERLOGGED, false));
+                    }
+                    chunk.setUnsaved(true);
+                    // Handle the rest
+                } else {
+                    fluidStates.put(iPos, fluidState);
+                    if (!level.isClientSide() && !(level instanceof WorldGenRegion)) {
+                        safeSyncChunkAttachment(chunk, FLUID_STATES);
+                    }
+                    int lightLevel = fluidState.getFluidType().getLightLevel(fluidState, level, pos);
+                    int oldLightLevel = lightLevel;
+                    if (lManagerExists) {
+                        oldLightLevel = lManager.getLightAt(pos);
+                        lManager.setLightAt(iPos, lightLevel);
+                    }
+                    if (ServerConfig.considerFluidLightLevel && level instanceof ServerLevel sLevel) {
+                        // Avoid redundant packets
+                        if (oldLightLevel != lightLevel) {
+                            updateClientLightLevels(
+                                    pos,
+                                    lightLevel,
+                                    sLevel,
+                                    true
+                            );
+                        }
+                    }
+                    chunk.setUnsaved(true);
                 }
-                if (lManagerExists) {
-                    lManager.removeLightAt(iPos);
-                }
-                if (level.isClientSide()) {
-                    // Strangely, this is the one place where setting the blocks dirty actually had an effect on rendering
-                    ClientClassWrappers.setDirtyFromSharedCode(level, pos, state.setValue(WATERLOGGED, true), state.setValue(WATERLOGGED, false));
-                }
-                chunk.setUnsaved(true);
-                // Handle the rest
-            } else {
-                fluidStates.put(iPos, fluidState);
-                if (!level.isClientSide() && !(level instanceof WorldGenRegion)) {
-                    safeSyncChunkAttachment(chunk, FLUID_STATES);
-                }
-                int lightLevel = fluidState.getFluidType().getLightLevel(fluidState, level, pos);
-                int oldLightLevel = lightLevel;
-                if (lManagerExists) {
-                    oldLightLevel = lManager.getLightAt(pos);
-                    lManager.setLightAt(iPos, lightLevel);
-                }
-                if (ServerConfig.considerFluidLightLevel && level instanceof ServerLevel sLevel) {
-                    // Avoid redundant packets
-                    if (oldLightLevel != lightLevel) {
-                        updateClientLightLevels(
-                                pos,
-                                lightLevel,
-                                sLevel,
-                                true
+                // If these run on the client, they'll trigger before the attachment syncs
+                level.setBlock(iPos, state.setValue(WATERLOGGED, !fluidState.isEmpty()), Block.UPDATE_ALL);
+                level.scheduleTick(iPos, fluidState.getType(), fluidState.getType().getTickDelay(level));
+                // Force a chunk update, if there otherwise wouldn't be one
+                if (ServerConfig.forceChunkUpdates) {
+                    if (wasLogged && level instanceof ServerLevel sLevel && chunk instanceof LevelChunk lChunk) {
+                        sLevel.getPlayers(player ->
+                                player.shouldRenderAtSqrDistance(player.distanceToSqr(pos.getX(), pos.getY(), pos.getZ()))
+                        ).forEach(player -> {
+                                    player.connection.chunkSender.markChunkPendingToSend(lChunk);
+                                    player.connection.chunkSender.sendNextChunks(player);
+                                }
                         );
                     }
                 }
-                chunk.setUnsaved(true);
-            }
-            // If these run on the client, they'll trigger before the attachment syncs
-            level.setBlock(iPos, state.setValue(WATERLOGGED, !fluidState.isEmpty()), Block.UPDATE_ALL);
-            level.scheduleTick(iPos, fluidState.getType(), fluidState.getType().getTickDelay(level));
-            // Force a chunk update, if there otherwise wouldn't be one
-            if (ServerConfig.forceChunkUpdates) {
-                if (wasLogged && level instanceof ServerLevel sLevel && chunk instanceof LevelChunk lChunk) {
-                    sLevel.getPlayers(player ->
-                            player.shouldRenderAtSqrDistance(player.distanceToSqr(pos.getX(), pos.getY(), pos.getZ()))
-                    ).forEach(player -> {
-                                player.connection.chunkSender.markChunkPendingToSend(lChunk);
-                                player.connection.chunkSender.sendNextChunks(player);
-                            }
-                    );
-                }
+                
+                return true;
             }
             
-            return true;
+            return false;
         }
-        
-        return false;
     }
     
     /**

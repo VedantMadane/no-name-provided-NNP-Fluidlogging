@@ -14,15 +14,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A map from BlockPos to FluidState. Not prepopulated - a position without a fluidlogged block is a missing entry. Not
- * intended for waterlogged blocks.
+ * Exposes a map from BlockPos to FluidState. Not prepopulated - a position without a fluidlogged block is a missing
+ * entry. Not intended for fully waterlogged blocks (vanilla waterlogging).
  * <p>
  * This is stored in a record because it will be used for attachments, and those must be "immutable".
+ * </p>
+ * <p>
+ * THe internal maps shouldn't be mutated directly unless you know what you're doing. May cause sync errors.
+ *     TODO: refactor to protect those maps
  * </p>
  */
 public record FluidStates(HashMap<BlockPos, FluidState> map, HashMap<BlockPos, FluidState> unsyncedUpdates) {
     
-    public static Codec<FluidStates> CODEC = RecordCodecBuilder.create(inst ->
+    /**
+     * A codec used to (de)serialize this class for storage/retrieval from memory or JSON.
+     */
+    public static final Codec<FluidStates> CODEC = RecordCodecBuilder.create(inst ->
             inst.group(
                     Codec.unboundedMap(
                                     // Unbound map keys must begin with strings (or things built on them)
@@ -36,9 +43,24 @@ public record FluidStates(HashMap<BlockPos, FluidState> map, HashMap<BlockPos, F
             ).apply(inst, instance -> new FluidStates(instance, new HashMap<>()))
     );
     
+    /**
+     * The simplest StreamCodec for this class. Hard to see how it works under the hood, its performance
+     * characteristics, and if it has undocumented limitations.
+     */
+    public static final StreamCodec<RegistryFriendlyByteBuf, FluidStates> SIMPLE_STREAM_CODEC =
+            ByteBufCodecs.fromCodecWithRegistries(CODEC);
+    
+    /**
+     * The simplest stream codec for FluidState. Hard to see how it works under the hood, its performance
+     * characteristics, and if it has undocumented limitations.
+     */
     private static final StreamCodec<RegistryFriendlyByteBuf, FluidState> FLUID_STATE_STREAM_CODEC =
             ByteBufCodecs.fromCodecWithRegistries(FluidState.CODEC);
     
+    /**
+     * A simple stream codec for this class' HashMaps. A bit hard to see how it works under the hood, its performance
+     * characteristics, and if it has undocumented limitations.
+     */
     public static StreamCodec<RegistryFriendlyByteBuf, HashMap<BlockPos, FluidState>> STREAM_CODEC_FOR_UPDATES =
             ByteBufCodecs.map(
                     HashMap::new,
@@ -46,6 +68,11 @@ public record FluidStates(HashMap<BlockPos, FluidState> map, HashMap<BlockPos, F
                     FLUID_STATE_STREAM_CODEC
             );
     
+    /**
+     * Handwritten en/decoder combination for this class' HashMaps with known properties. Always writes at least one
+     * VAR_INT to buffer. Explicitly supports empty maps, but we should still avoid encoding them because that would
+     * create vacuous update packets.
+     */
     public static StreamCodec<RegistryFriendlyByteBuf, HashMap<BlockPos, FluidState>> SAFE_STREAM_CODEC_FOR_UPDATES =
             StreamCodec.of(
                     (buf, map) -> {
@@ -79,11 +106,12 @@ public record FluidStates(HashMap<BlockPos, FluidState> map, HashMap<BlockPos, F
     @SuppressWarnings("UnusedReturnValue") // matches signature of wrapped method
     public @Nullable FluidState put(BlockPos pos, FluidState state) {
         map().put(pos, state);
+        
         return unsyncedUpdates().put(pos, state);
     }
     
     /**
-     * Wrapper for Map#put that updates our map of unsynced updates.
+     * Wrapper for Map#putAll that updates our map of unsynced updates.
      *
      * @param changedEntries Map of entries that have been changed.
      */
@@ -96,6 +124,7 @@ public record FluidStates(HashMap<BlockPos, FluidState> map, HashMap<BlockPos, F
      * Wrapper for internal map method of same name.
      */
     public @Nullable FluidState get(BlockPos pos) {
+        
         return map().get(pos);
     }
     
@@ -103,6 +132,7 @@ public record FluidStates(HashMap<BlockPos, FluidState> map, HashMap<BlockPos, F
      * Wrapper for internal map method of same name.
      */
     public FluidState getOrDefault(BlockPos pos, FluidState defaultState) {
+        
         return map().getOrDefault(pos, defaultState);
     }
     

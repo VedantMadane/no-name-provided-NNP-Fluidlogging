@@ -44,6 +44,6 @@ abstract class FFluidlogging_ServerLevel extends Level implements WorldGenLevel 
         // The block position local capture seems like it should have an ordinal of 1.
         // However, perhaps because the earlier BlockPos is declared in a narrower scope, this is the first
         // valid variable in the table.
-        return this.getFluidState(pos);
+        return getFluidState(pos);
     }
 }

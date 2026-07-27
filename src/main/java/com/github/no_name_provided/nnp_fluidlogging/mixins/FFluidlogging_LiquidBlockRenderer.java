@@ -6,7 +6,6 @@ import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.Fluid;
@@ -140,16 +139,13 @@ abstract class FFluidlogging_LiquidBlockRenderer {
         BlockState state = level.getBlockState(pos);
         // This first check is just an efficiency thing, borrowed from vanilla
         if (!state.isAir()) {
-            if (state.getBlock() instanceof LiquidBlock) {
-                
-                return state.getFluidState();
-            } else if (state.hasProperty(BlockStateProperties.WATERLOGGED)) {
+            if (state.hasProperty(BlockStateProperties.WATERLOGGED)) {
                 
                 return level.getFluidState(pos);
             }
             
             // We can't assume this is empty, as it could be a LiquidBlockContainer that doesn't
-            // implement SimpleWaterloggedBlock, like KelpBlock.
+            // implement SimpleWaterloggedBlock, like KelpBlock, or a LiquidBlock.
             return state.getFluidState();
         }
         

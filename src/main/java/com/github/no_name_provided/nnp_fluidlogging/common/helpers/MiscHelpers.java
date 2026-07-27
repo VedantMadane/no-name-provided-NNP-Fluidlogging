@@ -4,11 +4,20 @@ import com.github.no_name_provided.nnp_fluidlogging.common.network.payloads.AuxL
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredHolder;
+
+import java.util.Optional;
+
+import static com.github.no_name_provided.nnp_fluidlogging.common.attachments.FAttachments.FLUID_STATES;
+import static com.github.no_name_provided.nnp_fluidlogging.common.config.ServerConfig.explicitlyDoNotSupportWorldgen;
 
 public class MiscHelpers {
     
@@ -23,6 +32,21 @@ public class MiscHelpers {
                         server.isSameThread()
         ) {
             levelChunk.syncData(type);
+        }
+    }
+    
+    /**
+     * This shouldn't be necessary on the client, unless the client is for some reason requesting information about
+     * unloaded chunks... in which case the #isInLevel check will be insufficient, as its always true on the client, and
+     * we'll need to check chunk status.
+     */
+    public static <T> Optional<T> safeGetChunkAttachment(AttachmentType<T> type, ChunkAccess chunk) {
+        if (chunk instanceof LevelChunk levelChunk && levelChunk.isInLevel()) {
+            
+            return Optional.of(chunk.getData(type));
+        } else {
+            
+            return Optional.empty();
         }
     }
     
@@ -42,5 +66,16 @@ public class MiscHelpers {
                         lightLevel,
                         pos.asLong()))
         );
+    }
+    
+    public static void fixScheduledFluidTick(LevelAccessor level, BlockPos pos) {
+        if (!(explicitlyDoNotSupportWorldgen && level instanceof WorldGenRegion)) {
+            // Use our attachment when available
+            Fluid trueFluid = level.getChunk(pos).getData(FLUID_STATES).getOrDefault(pos, Fluids.EMPTY.defaultFluidState()).getType();
+            level.scheduleTick(pos, trueFluid, trueFluid.getTickDelay(level));
+        } else {
+            // vanilla call
+            level.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(level));
+        }
     }
 }

@@ -26,7 +26,8 @@ public class FAttachments {
     public static DeferredHolder<AttachmentType<?>, AttachmentType<FluidStates>> FLUID_STATES = FATTACHMENTS.register(
             "fluid_states", () -> AttachmentType.builder(() -> new FluidStates(new HashMap<>(), new HashMap<>()))
                     .sync(new FluidStatesAttachmentSyncHandler())
-                    .serialize(FluidStates.CODEC).build()
+                    .serialize(FluidStates.CODEC)
+                    .build()
     );
     
     /**

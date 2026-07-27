@@ -16,6 +16,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import static com.github.no_name_provided.nnp_fluidlogging.common.helpers.MiscHelpers.fixScheduledFluidTick;
+
 @Mixin(LeavesBlock.class)
 abstract class FFluidlogging_LeavesBlock extends Block {
     protected FFluidlogging_LeavesBlock(Properties props) {
@@ -25,8 +27,7 @@ abstract class FFluidlogging_LeavesBlock extends Block {
     @Redirect(method = "updateShape(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/Direction;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/LevelAccessor;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/state/BlockState;",
     at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/LevelAccessor;scheduleTick(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/material/Fluid;I)V"))
     private void nnp_f_fluidlogging_getFluidState(LevelAccessor level, BlockPos pos, Fluid fluid, int tickDelay) {
-        Fluid trueFluid = level.getFluidState(pos).getType();
-        level.scheduleTick(pos, trueFluid, trueFluid.getTickDelay(level));
+        fixScheduledFluidTick(level, pos);
     }
     
     /**

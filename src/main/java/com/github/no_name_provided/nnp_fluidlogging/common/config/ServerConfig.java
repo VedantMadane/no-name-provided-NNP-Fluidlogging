@@ -51,6 +51,9 @@ public class ServerConfig {
     private static final ModConfigSpec.BooleanValue FLOWING_FLUIDS_CAN_LOG =
             BUILDER.comment("Can partial fluid blocks waterlog")
                     .define("flowing_fluids_log", false);
+    private static final ModConfigSpec.BooleanValue EXPLICITLY_DO_NOT_SUPPORT_WORLDGEN =
+            BUILDER.comment("Can we assume you aren't trying to worldgen blocks logged with non-vanilla fluids? There may be a significant performance penalty if we can't.")
+                    .define("explicitly_do_not_support_worldgen", true);
     private static final ModConfigSpec.BooleanValue FORCE_CHUNK_UPDATES =
             BUILDER.comment("Should we force chunk updates (resolves sync issues, but may cause stability problems)")
                     .define("force_chunk_updates", false);
@@ -61,6 +64,7 @@ public class ServerConfig {
     public static List<? extends String> blacklistedBlocks;
     public static boolean considerFluidLightLevel;
     public static boolean flowingFluidsCanLog;
+    public static boolean explicitlyDoNotSupportWorldgen;
     public static boolean forceChunkUpdates;
     
     protected static String supplyFluid() {
@@ -101,6 +105,7 @@ public class ServerConfig {
             blacklistedBlocks = BLACKLISTED_BLOCKS.get();
             considerFluidLightLevel = CONSIDER_FLUID_LIGHT_LEVEL.get();
             flowingFluidsCanLog = FLOWING_FLUIDS_CAN_LOG.get();
+            explicitlyDoNotSupportWorldgen = EXPLICITLY_DO_NOT_SUPPORT_WORLDGEN.get();
             forceChunkUpdates = FORCE_CHUNK_UPDATES.get();
         }
     }

@@ -101,12 +101,9 @@ abstract class FFluidlogging_FlowingFluid extends Fluid {
                     }
                 }
             }
-            
-            return original;
-        } else {
-            
-            return original;
         }
+        
+        return original;
     }
     
     //endregion ---------------------------------------------------------------------

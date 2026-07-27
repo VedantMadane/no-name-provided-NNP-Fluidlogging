@@ -2,7 +2,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'idea'
-    id 'net.neoforged.moddev' version '2.0.139'
+    id 'net.neoforged.moddev' version '2.0.142'
 }
 
 version = mod_version
@@ -47,13 +47,15 @@ neoForge {
             client()
             programArgument '--Dmixin.debug.export=true'
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            //noinspection GroovyAssignabilityCheck
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
 
         server {
             server()
             programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            //noinspection GroovyAssignabilityCheck
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
 
         // This run config launches GameTestServer and runs all registered gametests, then exits.
@@ -61,7 +63,8 @@ neoForge {
         // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
             type = "gameTestServer"
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            //noinspection GroovyAssignabilityCheck
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
 
         data {
@@ -71,7 +74,8 @@ neoForge {
             // gameDirectory = project.file('run-data')
 
             // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+            //noinspection GroovyAssignabilityCheck
+            programArguments.addAll '--mod', mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
         }
 
         // applies to all the run configs above
@@ -96,6 +100,7 @@ neoForge {
         // mostly optional in a single mod project
         // but multi mod projects should define one per mod
         "${mod_id}" {
+            //noinspection GroovyAssignabilityCheck
             sourceSet(sourceSets.main)
         }
     }
@@ -169,6 +174,7 @@ neoForge.ideSyncTask generateModMetadata
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
+            //noinspection GroovyAssignabilityCheck
             from components.java
         }
     }

@@ -1,6 +1,5 @@
 package com.github.no_name_provided.nnp_fluidlogging.mixins;
 
-import com.github.no_name_provided.nnp_fluidlogging.common.attachments.FluidStates;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
@@ -34,9 +33,11 @@ abstract class FFluidlogging_LevelChunk extends ChunkAccess {
     @Final @Shadow
     Level level;
     
-    @Shadow private boolean loaded;
+    @Shadow
+    private boolean loaded;
     
-    @Shadow public abstract ChunkStatus getPersistedStatus();
+    @Shadow
+    public abstract ChunkStatus getPersistedStatus();
     
     private FFluidlogging_LevelChunk(ChunkPos pos, UpgradeData data, LevelHeightAccessor heightGetter, Registry<Biome> biomeRegistry, long rand, @Nullable LevelChunkSection[] levelChunkSections, @Nullable BlendingData blendingData) {
         super(pos, data, heightGetter, biomeRegistry, rand, levelChunkSections, blendingData);
@@ -56,10 +57,9 @@ abstract class FFluidlogging_LevelChunk extends ChunkAccess {
         // the majority of the lag was fixed by using correct (section) coordinates
         
         if (loaded && level.hasChunk(chunkPos.x, chunkPos.z)) {
-            FluidStates states = getData(FLUID_STATES);
             
             // Might have a recursion issue somewhere with this default value
-            return states.getOrDefault(new BlockPos(x, y, z), original.call(x, y, z));
+            return getData(FLUID_STATES).getOrDefault(new BlockPos(x, y, z), original.call(x, y, z));
         } else {
             
             return original.call(x, y, z);

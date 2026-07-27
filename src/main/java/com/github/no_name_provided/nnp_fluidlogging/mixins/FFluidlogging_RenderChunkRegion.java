@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.chunk.RenderChunkRegion;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.material.FluidState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -29,10 +30,6 @@ abstract class FFluidlogging_RenderChunkRegion implements BlockAndTintGetter {
      * <p>
      * Heavily borrows from vanilla.
      * </p>
-     * <p>
-     * Ignores the original operation for performance reasons, but other modders are free to "override" this with a
-     * higher/lower priority mixin.
-     * </p>
      *
      * @param pos Location of the block space in the level.
      */
@@ -40,6 +37,11 @@ abstract class FFluidlogging_RenderChunkRegion implements BlockAndTintGetter {
     private FluidState nnp_f_fluidlogging_getFluidState(BlockPos pos, Operation<FluidState> original) {
         RenderChunk chunk = this.getChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
         
-        return (chunk.wrapped.getData(FLUID_STATES).getOrDefault(pos, chunk.getBlockState(pos).getFluidState()));
+        // We only want to query our attachment on the client if the client has the chunk ready (neo syncing fails gracelessy)
+        // May not be necessary, as most problems are serverside, but this is fairly harmless and may improve performance during worldgen
+        // TODO: benchmark with/without status check while worldgenning kelp`n stuff
+        return chunk.wrapped.getPersistedStatus() == ChunkStatus.FULL ?
+                (chunk.wrapped.getData(FLUID_STATES).getOrDefault(pos, chunk.getBlockState(pos).getFluidState())) :
+                original.call(pos);
     }
 }

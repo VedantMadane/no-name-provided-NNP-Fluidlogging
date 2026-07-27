@@ -5,6 +5,7 @@ import com.github.no_name_provided.nnp_fluidlogging.common.data_maps.contents.Bl
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
@@ -43,7 +44,7 @@ abstract class FFluidlogging_BlockBehavior {
     @Inject(method = "updateShape(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/Direction;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/LevelAccessor;Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/state/BlockState;",
             at = @At("TAIL"))
     private void nnp_f_fluidlogging_updateShape(BlockState newState, Direction direction, BlockState oldState, LevelAccessor level, BlockPos pos, BlockPos triggerPos, CallbackInfoReturnable<BlockState> cir) {
-        if (newState.getBlock() instanceof SimpleWaterloggedBlock) {
+        if (newState.getBlock() instanceof SimpleWaterloggedBlock && !(level instanceof WorldGenRegion)) {
             FluidState fluidState = level.getFluidState(pos);
             if (!fluidState.isEmpty()) {
                 level.scheduleTick(pos, fluidState.getType(), fluidState.getType().getTickDelay(level));
@@ -172,7 +173,7 @@ abstract class FFluidlogging_BlockBehavior {
     private void nnp_f_fluidlogging_onRemove(BlockState newState, Level level, BlockPos pos, BlockState oldState, boolean flag, CallbackInfo ci) {
         if (!newState.hasProperty(BlockStateProperties.WATERLOGGED)) {
             ChunkAccess chunk = level.getChunk(pos);
-            // This is fine, since we shouldn't have null values in this map
+            // This is fine, since we shouldn't have null values in this map; conditional has side effects
             if (!level.isClientSide() && chunk.getData(FLUID_STATES).remove(pos) != null) {
                 safeSyncChunkAttachment(chunk, FLUID_STATES);
                 chunk.setUnsaved(true);
