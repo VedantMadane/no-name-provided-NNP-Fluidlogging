@@ -34,9 +34,11 @@ abstract class FFluidlogging_LevelChunk extends ChunkAccess {
     @Final @Shadow
     Level level;
     
-    @Shadow private boolean loaded;
+    @Shadow
+    private boolean loaded;
     
-    @Shadow public abstract ChunkStatus getPersistedStatus();
+    @Shadow
+    public abstract ChunkStatus getPersistedStatus();
     
     private FFluidlogging_LevelChunk(ChunkPos pos, UpgradeData data, LevelHeightAccessor heightGetter, Registry<Biome> biomeRegistry, long rand, @Nullable LevelChunkSection[] levelChunkSections, @Nullable BlendingData blendingData) {
         super(pos, data, heightGetter, biomeRegistry, rand, levelChunkSections, blendingData);

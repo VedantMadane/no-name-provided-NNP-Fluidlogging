@@ -20,6 +20,7 @@ public class FAttachments {
             NeoForgeRegistries.ATTACHMENT_TYPES,
             MODID
     );
+    
     /**
      * The attachment we use to store fluid information for logged blocks.
      */
