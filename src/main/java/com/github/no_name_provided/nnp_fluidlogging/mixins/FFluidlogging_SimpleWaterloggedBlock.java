@@ -3,6 +3,7 @@ package com.github.no_name_provided.nnp_fluidlogging.mixins;
 import com.github.no_name_provided.nnp_fluidlogging.common.attachments.FluidStates;
 import com.github.no_name_provided.nnp_fluidlogging.common.config.ServerConfig;
 import com.github.no_name_provided.nnp_fluidlogging.common.data_maps.contents.BlockStateFluidLevelLimits;
+import com.github.no_name_provided.nnp_fluidlogging.common.tags.NNPFFluidTags;
 import com.github.no_name_provided.nnp_fluidlogging.common.wrappers.ClientClassWrappers;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -44,7 +45,8 @@ import static com.github.no_name_provided.nnp_fluidlogging.common.helpers.MiscHe
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
 
 /**
- * Important mixins - allow SimpleWaterloggedBlock to interact with our attachment.
+ * Important mixins - allow SimpleWaterloggedBlock to interact with our attachment. Most (or all) vanilla water
+ * loggables implement this interface.
  */
 @Mixin(SimpleWaterloggedBlock.class)
 public interface FFluidlogging_SimpleWaterloggedBlock {
@@ -63,7 +65,8 @@ public interface FFluidlogging_SimpleWaterloggedBlock {
         boolean isFluidBlacklisted = false;
         Optional<ResourceKey<Fluid>> key = BuiltInRegistries.FLUID.getResourceKey(fluid);
         if (key.isPresent()) {
-            isFluidBlacklisted = ServerConfig.blacklistedFluids.contains(key.get().location().toString());
+            //noinspection deprecation - more efficient than going through #defaultFluidState, which puts us in the same place
+            isFluidBlacklisted = ServerConfig.blacklistedFluids.contains(key.get().location().toString()) || fluid.is(NNPFFluidTags.DOES_NOT_LOG);
         }
         boolean isBlockBlacklisted = ServerConfig.blacklistedBlocks.contains(state.getBlockHolder().getRegisteredName());
         // Filter out fluids without buckets, to avoid an entire category of potential errors.
