@@ -1,5 +1,6 @@
 package com.github.no_name_provided.nnp_fluidlogging.mixins;
 
+import com.github.no_name_provided.nnp_fluidlogging.common.attachments.FluidStates;
 import com.github.no_name_provided.nnp_fluidlogging.common.config.ServerConfig;
 import com.github.no_name_provided.nnp_fluidlogging.common.data_maps.contents.BlockStateFluidLevelLimits;
 import net.minecraft.core.BlockPos;
@@ -84,7 +85,7 @@ abstract class FFluidlogging_BlockBehavior {
                     // We don't need to avoid #getFluidState for liquid blocks.
                     // Since they can't be logged, it's always correct
                     chunk.getData(FLUID_STATES).put(pos, oldState.getFluidState());
-                    if (!level.isClientSide() && isLoaded) {
+                    if (isLoaded) {
                         safeSyncChunkAttachment(chunk, FLUID_STATES);
                     }
                     AuxiliaryLightManager lManager = level.getAuxLightManager(pos);
@@ -122,12 +123,66 @@ abstract class FFluidlogging_BlockBehavior {
                         }
                     }
                 }
+                // Handle a transition from one loggable block to another (eg, stacking slabs).
+                // Consider using helper methods to unify fluid placement logic
+            } else if (isLoaded && level.getChunk(pos) instanceof LevelChunk chunk && newState.getBlock() instanceof SimpleWaterloggedBlock simpleWaterloggedBlock) {
+                FluidStates states = chunk.getData(FLUID_STATES);
+                FluidState oldFluidState = states.getOrDefault(pos, Fluids.EMPTY.defaultFluidState());
+                FluidState newFluidState = oldFluidState;
+                AuxiliaryLightManager lManager = level.getAuxLightManager(pos);
+                boolean lManagerExists = null != lManager;
+                // We check this here, since #pickupBlock updates the light level
+                int oldLightLevel = 0;
+                if (lManagerExists) {
+                    oldLightLevel = lManager.getLightAt(pos);
+                }
+                if (!simpleWaterloggedBlock.canPlaceLiquid(null, level, pos, newState, oldFluidState.getType())) {
+                    newFluidState = Fluids.EMPTY.defaultFluidState();
+                    simpleWaterloggedBlock.pickupBlock(null, level, pos.immutable(), newState);
+                } else if (!oldFluidState.isEmpty()) {
+                    BlockStateFluidLevelLimits levelLimits = newState.getBlockHolder().getData(BLOCKSTATE_FLUID_LEVEL_LIMITS);
+                    if (levelLimits != null) {
+                        if (oldFluidState.getAmount() < levelLimits.getMinLevel(newState, oldFluidState.getFluidType())) {
+                            newFluidState = Fluids.EMPTY.defaultFluidState();
+                            simpleWaterloggedBlock.pickupBlock(null, level, pos.immutable(), newState);
+                        } else if (oldFluidState.getAmount() > levelLimits.getMaxLevel(newState, oldFluidState.getFluidType())) {
+                            // Makes sure the level isn't too high - only supports flowing fluids
+                            if (oldFluidState.isSource() && oldFluidState.getType() instanceof FlowingFluid flowingFluid) {
+                                newFluidState = flowingFluid.getFlowing(levelLimits.getMaxLevel(newState, oldFluidState.getFluidType()), false);
+                                states.put(pos.immutable(), newFluidState);
+                            } else {
+                                newFluidState = oldFluidState.trySetValue(BlockStateProperties.LEVEL_FLOWING, levelLimits.getMaxLevel(newState, oldFluidState.getFluidType()));
+                                states.put(pos.immutable(), newFluidState);
+                            }
+                            // #onPlace only executes on server
+                            safeSyncChunkAttachment(chunk, FLUID_STATES);
+                        }
+                    }
+                }
+                // Since #pickupBlock expects to be called on both sides, we need to add some sync logic here
+                int lightLevel = newFluidState.getFluidType().getLightLevel(newFluidState, level, pos);
+                if (lManagerExists) {
+                    lManager.setLightAt(pos.immutable(), lightLevel);
+                    
+                    if (ServerConfig.considerFluidLightLevel && level instanceof ServerLevel sLevel) {
+                        // Avoid redundant packets
+                        if (oldLightLevel != lightLevel) {
+                            updateClientLightLevels(
+                                    pos.immutable(),
+                                    lightLevel,
+                                    sLevel,
+                                    true
+                            );
+                        }
+                    }
+                }
+                chunk.setUnsaved(true);
             }
             // Clean up any lingering entry in our data structure. Shouldn't be necessary,
             // and can probably be removed if there's a performance issue
         } else if (level.getChunk(pos) instanceof LevelChunk chunk && isLoaded) {
             // Conditional has side effects
-            if (!level.isClientSide() && chunk.getData(FLUID_STATES).remove(pos) != null) {
+            if (chunk.getData(FLUID_STATES).remove(pos) != null) {
                 safeSyncChunkAttachment(chunk, FLUID_STATES);
                 chunk.setUnsaved(true);
             }

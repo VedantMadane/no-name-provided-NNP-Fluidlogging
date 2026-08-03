@@ -49,6 +49,10 @@ public class FluidLevelCallbacks {
     public static Supplier<BiFunction<BlockState, FluidType, Integer>> SLAB_MAX = FLUID_LEVEL_CALLBACKS.register(
             "slab_max",
             () -> (blockState, unusedType) -> {
+                if (blockState.getValue(SlabBlock.TYPE) == SlabType.DOUBLE) {
+
+                    return 0;
+                }
                 boolean isBottom = blockState.getValue(SlabBlock.TYPE) == SlabType.BOTTOM;
                 
                 return isBottom ? 8 : 4;
