@@ -131,20 +131,18 @@ abstract class FFluidlogging_BlockBehavior {
                 FluidState newFluidState = oldFluidState;
                 AuxiliaryLightManager lManager = level.getAuxLightManager(pos);
                 boolean lManagerExists = null != lManager;
-                // We check this here, since #pickupBlock updates the light level
-                int oldLightLevel = 0;
-                if (lManagerExists) {
-                    oldLightLevel = lManager.getLightAt(pos);
-                }
                 if (!simpleWaterloggedBlock.canPlaceLiquid(null, level, pos, newState, oldFluidState.getType())) {
                     newFluidState = Fluids.EMPTY.defaultFluidState();
-                    simpleWaterloggedBlock.pickupBlock(null, level, pos.immutable(), newState);
+                    states.remove(pos.immutable());
+                    safeSyncChunkAttachment(chunk, FLUID_STATES);
                 } else if (!oldFluidState.isEmpty()) {
                     BlockStateFluidLevelLimits levelLimits = newState.getBlockHolder().getData(BLOCKSTATE_FLUID_LEVEL_LIMITS);
                     if (levelLimits != null) {
                         if (oldFluidState.getAmount() < levelLimits.getMinLevel(newState, oldFluidState.getFluidType())) {
                             newFluidState = Fluids.EMPTY.defaultFluidState();
-                            simpleWaterloggedBlock.pickupBlock(null, level, pos.immutable(), newState);
+                            states.remove(pos.immutable());
+                            // #onPlace only executes on server, so we don't need to check sides
+                            safeSyncChunkAttachment(chunk, FLUID_STATES);
                         } else if (oldFluidState.getAmount() > levelLimits.getMaxLevel(newState, oldFluidState.getFluidType())) {
                             // Makes sure the level isn't too high - only supports flowing fluids
                             if (oldFluidState.isSource() && oldFluidState.getType() instanceof FlowingFluid flowingFluid) {
@@ -154,14 +152,15 @@ abstract class FFluidlogging_BlockBehavior {
                                 newFluidState = oldFluidState.trySetValue(BlockStateProperties.LEVEL_FLOWING, levelLimits.getMaxLevel(newState, oldFluidState.getFluidType()));
                                 states.put(pos.immutable(), newFluidState);
                             }
-                            // #onPlace only executes on server
                             safeSyncChunkAttachment(chunk, FLUID_STATES);
                         }
                     }
                 }
-                // Since #pickupBlock expects to be called on both sides, we need to add some sync logic here
+                // Since this is only called on the server, we need to add some sync logic here
                 int lightLevel = newFluidState.getFluidType().getLightLevel(newFluidState, level, pos);
+                int oldLightLevel;
                 if (lManagerExists) {
+                    oldLightLevel = lManager.getLightAt(pos);
                     lManager.setLightAt(pos.immutable(), lightLevel);
                     
                     if (ServerConfig.considerFluidLightLevel && level instanceof ServerLevel sLevel) {
