@@ -1,6 +1,8 @@
 package com.github.no_name_provided.nnp_fluidlogging.mixins;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
@@ -98,6 +100,22 @@ abstract class FFluidlogging_LiquidBlockRenderer {
     private FluidState nnp_f_fluidlogging_tesselate_fluidstate5(FluidState value, BlockAndTintGetter level, BlockPos pos, VertexConsumer buffer, BlockState blockState, FluidState fluidState) {
         
         return NNPFluidlogging$checkFluidState(pos.relative(Direction.EAST), level);
+    }
+    
+    /**
+     * Stops the upper fluid face from being hidden if the current FluidState is water and the above BlockState has a
+     * default associated FluidState that's also water (eg, when two copper grates are stacked, the lower has water, and
+     * the upper has lava).
+     * <p>
+     * We don't use the original here, so a redirect might have been better.
+     * </p>
+     */
+    @ModifyExpressionValue(method = "tesselate(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/material/FluidState;)V",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/block/LiquidBlockRenderer;isNeighborStateHidingOverlay(Lnet/minecraft/world/level/material/FluidState;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/Direction;)Z")
+    )
+    private boolean nnp_f_fluidlogging_tesselate_flag1(boolean original, BlockAndTintGetter level, BlockPos pos, VertexConsumer buffer, BlockState blockState, FluidState fluidState, @Local(name = "fluidstate1") FluidState fluidstate1) {
+        
+        return fluidstate1.getType().isSame(fluidState.getType());
     }
     
     //endregion ------------------------------------------------------------
