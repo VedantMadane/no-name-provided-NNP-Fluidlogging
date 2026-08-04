@@ -71,7 +71,9 @@ public class MiscHelpers {
     public static void fixScheduledFluidTick(LevelAccessor level, BlockPos pos) {
         if (!(explicitlyDoNotSupportWorldgen && level instanceof WorldGenRegion)) {
             // Use our attachment when available
-            Fluid trueFluid = level.getChunk(pos).getData(FLUID_STATES).getOrDefault(pos, Fluids.EMPTY.defaultFluidState()).getType();
+            Fluid trueFluid = level.getChunk(pos).getData(FLUID_STATES).getOrDefault(
+                    pos,
+                    level.getBlockState(pos).getFluidState()).getType();
             level.scheduleTick(pos, trueFluid, trueFluid.getTickDelay(level));
         } else {
             // vanilla call
