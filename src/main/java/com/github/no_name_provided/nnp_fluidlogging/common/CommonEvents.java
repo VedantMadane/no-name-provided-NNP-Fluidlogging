@@ -1,7 +1,12 @@
 package com.github.no_name_provided.nnp_fluidlogging.common;
 
+import com.github.no_name_provided.nnp_fluidlogging.common.commands.ClearFluidStates;
+import com.github.no_name_provided.nnp_fluidlogging.common.commands.GetFluidStates;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.registries.NewRegistryEvent;
 import net.neoforged.neoforge.registries.datamaps.RegisterDataMapTypesEvent;
 
@@ -29,5 +34,17 @@ public class CommonEvents {
     @SubscribeEvent
     static void onRegisterDataMaps(RegisterDataMapTypesEvent event) {
         event.register(BLOCKSTATE_FLUID_LEVEL_LIMITS);
+    }
+    
+    /**
+     * Register our in-game commands. See
+     * {@link  net.minecraft.commands.Commands#Commands} for vanilla examples.
+     */
+    @SubscribeEvent
+    static void onRegisterCommands(RegisterCommandsEvent event) {
+        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        
+        GetFluidStates.register(dispatcher);
+        ClearFluidStates.register(dispatcher);
     }
 }
