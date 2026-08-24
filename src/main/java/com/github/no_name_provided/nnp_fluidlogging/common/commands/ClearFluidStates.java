@@ -14,6 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.common.world.AuxiliaryLightManager;
 
 import javax.annotation.Nonnull;
 
@@ -73,20 +74,26 @@ public class ClearFluidStates {
     }
     
     /**
-     * The code that actually does the work - removes and syncs the states.
+     * The code that actually does the work - removes and syncs the FluidStates.
      */
     private static void execute(@Nonnull ServerPlayer player, ChunkAccess chunk) {
         player.sendSystemMessage(Component.literal("Clearing fluids on the " + (player.level().isClientSide() ? "client" : "server") + " side.").withStyle(ChatFormatting.BLUE));
+        AuxiliaryLightManager lManager = chunk.getAuxLightManager(chunk.getPos());
         // Make sure our attachment mutates on the main thread
         player.server.execute(() -> {
             FluidStates states = chunk.getData(FLUID_STATES);
-            states.map().forEach((key, value) -> {
+            states.map().forEach((pos, state) -> {
                 // Handle side effects
-                if (value.getFluidType().getLightLevel() != 0) {
-                    player.connection.send(new AuxLightManagerUpdatePayload(0, key.asLong()));
+                if (state.getFluidType().getLightLevel() != 0) {
+                    if (lManager != null) {
+                        lManager.removeLightAt(pos);
+                    } else {
+                        LogUtils.getLogger().error("Unable to clear (server) light level at {}. Make sure the chunk is fully loaded.", pos);
+                    }
+                    player.connection.send(new AuxLightManagerUpdatePayload(0, pos.asLong()));
                 }
                 // Queue client updates
-                states.unsyncedUpdates().put(key, Fluids.EMPTY.defaultFluidState());
+                states.unsyncedUpdates().put(pos, Fluids.EMPTY.defaultFluidState());
             });
             states.map().clear();
             chunk.setUnsaved(true);
