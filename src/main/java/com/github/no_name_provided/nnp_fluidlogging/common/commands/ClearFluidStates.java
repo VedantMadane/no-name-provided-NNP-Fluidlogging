@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.material.Fluids;
 
 import javax.annotation.Nonnull;
 
@@ -79,12 +80,15 @@ public class ClearFluidStates {
         // Make sure our attachment mutates on the main thread
         player.server.execute(() -> {
             FluidStates states = chunk.getData(FLUID_STATES);
-            states.map().forEach((pos, state) -> {
-                states.remove(pos);
-                if (state.getFluidType().getLightLevel() != 0) {
-                    player.connection.send(new AuxLightManagerUpdatePayload(0, pos.asLong()));
+            states.map().forEach((key, value) -> {
+                // Handle side effects
+                if (value.getFluidType().getLightLevel() != 0) {
+                    player.connection.send(new AuxLightManagerUpdatePayload(0, key.asLong()));
                 }
+                // Queue client updates
+                states.unsyncedUpdates().put(key, Fluids.EMPTY.defaultFluidState());
             });
+            states.map().clear();
             chunk.setUnsaved(true);
             player.sendSystemMessage(Component.literal("Syncing attachment").withStyle(ChatFormatting.BLUE));
             chunk.syncData(FLUID_STATES);
