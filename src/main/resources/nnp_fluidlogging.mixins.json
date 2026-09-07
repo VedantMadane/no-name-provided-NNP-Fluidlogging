@@ -6,6 +6,7 @@
   "mixins": [
     "FFluidlogging_BlockBehavior",
     "FFluidlogging_BucketItem",
+    "FFluidlogging_Entity",
     "FFluidlogging_FlowingFluid",
     "FFluidlogging_IBlockExtension",
     "FFluidlogging_LevelChunk",
